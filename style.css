@@ -91,3 +91,41 @@ body {
     cursor: not-allowed;
     color: #fff;
 }
+#btn-end-turn {
+    padding: 5px 15px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+#btn-end-turn:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+/* 棋盤實體 (棋子) 樣式 */
+.board-entity {
+    width: 80%;
+    height: 80%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 14px;
+    font-weight: bold;
+    color: #fff;
+    border-radius: 50%; /* 預設為圓形 (士兵) */
+    box-shadow: 1px 1px 4px rgba(0,0,0,0.5);
+    pointer-events: none; /* 防止實體遮擋拖曳 drop 事件 */
+}
+
+/* 陣營顏色區分 */
+.entity-host { background-color: #d32f2f; }
+.entity-guest { background-color: #1976d2; }
+
+/* 君主特殊樣式 (方形且鑲邊) */
+.entity-king {
+    border-radius: 15%;
+    border: 3px solid gold;
+    background-color: #333; /* 底色覆蓋 */
+}
+.entity-king.entity-host { background-color: #b71c1c; }
+.entity-king.entity-guest { background-color: #0d47a1; }
