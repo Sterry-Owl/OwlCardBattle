@@ -7,7 +7,6 @@ import { GameEngine } from './game.js';
  * 確保 HTML DOM 完全載入後才執行程式
  */
 document.addEventListener('DOMContentLoaded', () => {
-    // 取得連線大廳與遊戲介面的 DOM 節點
     const btnCreateRoom = document.getElementById('btn-create-room');
     const btnJoinRoom = document.getElementById('btn-join-room');
     const inputRoomId = document.getElementById('input-room-id');
@@ -15,13 +14,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const connectionStatus = document.getElementById('connection-status');
     const lobbyContainer = document.getElementById('lobby-container');
     const gameContainer = document.getElementById('game-container');
+    const deckCountDisplay = document.getElementById('deck-count'); // 取得牌庫數字節點
     
-    let isHost = false; // 記錄本地玩家是否為房主
+    let isHost = false; 
 
-    // 初始化遊戲狀態機
     const gameEngine = new GameEngine();
 
-    // 初始化 UI 模組
     const uiManager = new UIManager(
         {
             board: document.getElementById('board'),
@@ -30,16 +28,12 @@ document.addEventListener('DOMContentLoaded', () => {
         },
         {
             onCardDropped: (data) => {
-                // 向 GameEngine 驗證出牌規則
                 const result = gameEngine.playCard(data.cardId, data.targetX, data.targetY);
                 
                 if (result.success) {
-                    // 更新本地端畫面
                     uiManager.renderHand(result.updatedHand);
                     uiManager.updateAP(result.currentAP, gameEngine.maxAP);
-                    // 註：此處尚未實作單一網格的渲染更新，後續需在 UIManager 擴充
                     
-                    // 將合法操作傳送給對手以同步狀態
                     networkManager.sendData({
                         action: 'PLAY_CARD',
                         cardId: data.cardId,
@@ -52,12 +46,10 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             onCellClicked: (data) => {
                 console.log('使用者點擊棋盤網格:', data);
-                // 預留：在此處處理棋子選取與移動/攻擊邏輯
             }
         }
     );
 
-    // 初始化網路模組
     const networkManager = new NetworkManager({
         onReady: (id) => {
             roomIdDisplay.textContent = id;
@@ -69,21 +61,35 @@ document.addEventListener('DOMContentLoaded', () => {
             lobbyContainer.style.display = 'none';
             gameContainer.style.display = 'block';
             
-            // 啟動遊戲核心邏輯
-            gameEngine.initGame(isHost);
+            // ----------------------------------------------------
+            // 模擬外部構築好的 20 張牌組 (15 士兵, 5 技能)
+            const myDeck = [];
+            for (let i = 1; i <= 15; i++) {
+                // 每張卡需給予初始 CD 值
+                myDeck.push({ id: `soldier_${i}`, name: '步兵', type: 'SOLDIER', currentCD: 1 });
+            }
+            for (let i = 1; i <= 5; i++) {
+                myDeck.push({ id: `skill_${i}`, name: '戰術衝鋒', type: 'SKILL', currentCD: 2 });
+            }
+            // ----------------------------------------------------
+
+            // 啟動遊戲核心邏輯，傳入建構好的牌組
+            gameEngine.initGame(isHost, myDeck);
             const initialState = gameEngine.getState();
             
             // 依據底層資料渲染初始畫面
             uiManager.renderBoard();
             uiManager.renderHand(initialState.hand);
             uiManager.updateAP(initialState.ap, initialState.maxAP);
+            
+            // 更新畫面上顯示的牌庫剩餘數量
+            if (deckCountDisplay) {
+                deckCountDisplay.textContent = initialState.deckCount;
+            }
         },
         onDataReceived: (data) => {
             console.log('接收到同步指令:', data);
-            
-            // 處理對方傳送過來的指令
             if (data.action === 'PLAY_CARD') {
-                // 預留：將對手的指令套用至本地 GameEngine 與 UI
                 console.log(`對手將卡牌放置於 [${data.targetX}, ${data.targetY}]`);
             }
         },
