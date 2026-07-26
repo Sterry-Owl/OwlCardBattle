@@ -16,7 +16,6 @@ export class UIManager {
             onEndTurnClicked: callbacks.onEndTurnClicked || (() => {})
         };
 
-        // 綁定結束回合按鈕事件
         if (this.btnEndTurn) {
             this.btnEndTurn.addEventListener('click', () => {
                 this.callbacks.onEndTurnClicked();
@@ -24,10 +23,6 @@ export class UIManager {
         }
     }
 
-    /**
-     * 渲染 8x8 棋盤與其內部實體
-     * @param {Array} boardData - GameEngine 的二維陣列狀態
-     */
     renderBoard(boardData) {
         this.boardElement.innerHTML = ''; 
 
@@ -64,18 +59,14 @@ export class UIManager {
                     }
                 });
 
-                // 若該座標有實體，則渲染棋子 DOM
                 const entityData = boardData[y][x];
                 if (entityData) {
                     const entityEl = document.createElement('div');
                     entityEl.classList.add('board-entity');
-                    // 區分陣營顏色
                     entityEl.classList.add(entityData.owner === 'HOST' ? 'entity-host' : 'entity-guest');
-                    // 若為君主，套用特殊樣式
                     if (entityData.type === '君主') {
                         entityEl.classList.add('entity-king');
                     }
-                    // 顯示文字
                     entityEl.textContent = entityData.type;
                     
                     cell.appendChild(entityEl);
@@ -86,13 +77,19 @@ export class UIManager {
         }
     }
 
-    renderHand(cards) {
+    /**
+     * 更新手牌畫面
+     * @param {Array} cards - 卡牌資料陣列
+     * @param {boolean} isMyTurn - 當前是否為己方回合
+     */
+    renderHand(cards, isMyTurn = false) {
         this.handContainer.innerHTML = ''; 
         cards.forEach(card => {
             const cardEl = document.createElement('div');
             cardEl.classList.add('card');
             
-            if (card.currentCD <= 0) {
+            // [Bug 修復] 必須同時滿足 CD 歸零與己方回合，才開放拖曳
+            if (card.currentCD <= 0 && isMyTurn) {
                 cardEl.draggable = true;
                 cardEl.addEventListener('dragstart', (e) => {
                     cardEl.classList.add('dragging');
@@ -103,7 +100,10 @@ export class UIManager {
                 });
             } else {
                 cardEl.draggable = false;
-                cardEl.classList.add('on-cooldown');
+                // 若為 CD 中，加上反灰樣式 (非回合中的可用卡牌僅鎖定拖曳，不反灰)
+                if (card.currentCD > 0) {
+                    cardEl.classList.add('on-cooldown');
+                }
             }
 
             const titleEl = document.createElement('div');
@@ -121,9 +121,6 @@ export class UIManager {
         this.apDisplay.textContent = `行動點數 (AP): ${currentAP} / ${maxAP}`;
     }
 
-    /**
-     * 更新回合狀態 UI (文字提示與按鈕鎖定)
-     */
     updateTurnStatus(isMyTurn) {
         if (isMyTurn) {
             this.turnIndicator.textContent = '當前狀態：您的回合';
