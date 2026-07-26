@@ -21,30 +21,50 @@ export class GameEngine {
 
     /**
      * 初始化遊戲狀態
-     * @param {boolean} isHost - 是否為房主 (決定先後手與初始位置)
-     * @param {Array} initialDeck - 玩家進入遊戲前配置的 20 張牌組
      */
     initGame(isHost, initialDeck) {
         this.isHost = isHost;
-        this.isMyTurn = isHost; 
-        this.currentAP = this.isMyTurn ? this.maxAP : 0;
-        
-        // 複製傳入的牌組並進行洗牌，形成此局遊戲的牌庫
         this.deck = this._shuffleArray([...initialDeck]);
 
-        // 初始化君主位置 (房主 [0,0]，客機 [7,7]；此為本地視角，未處理畫面翻轉)
-        this.board[this.kingPositions.HOST.y][this.kingPositions.HOST.x] = { type: 'KING', owner: 'HOST', hp: 10 };
-        this.board[this.kingPositions.GUEST.y][this.kingPositions.GUEST.x] = { type: 'KING', owner: 'GUEST', hp: 10 };
+        // 初始化君主位置
+        this.board[this.kingPositions.HOST.y][this.kingPositions.HOST.x] = { type: '君主', owner: 'HOST', hp: 10 };
+        this.board[this.kingPositions.GUEST.y][this.kingPositions.GUEST.x] = { type: '君主', owner: 'GUEST', hp: 10 };
 
-        // 規則：起始抽 3 張牌
         this.drawCard(3);
+
+        // 若為房主，直接啟動第一回合
+        if (isHost) {
+            this.startTurn();
+        } else {
+            this.isMyTurn = false;
+            this.currentAP = 0;
+        }
     }
 
     /**
-     * 內部方法：Fisher-Yates 洗牌演算法
-     * @param {Array} array 
-     * @returns {Array} 打亂後的陣列
+     * 回合開始邏輯 (重置 AP, CD 減 1, 抽 1 張卡)
      */
+    startTurn() {
+        this.isMyTurn = true;
+        this.currentAP = this.maxAP;
+        
+        // 手牌 CD 減 1
+        this.hand.forEach(card => {
+            if (card.currentCD > 0) card.currentCD--;
+        });
+        
+        this.drawCard(1);
+        return this.getState();
+    }
+
+    /**
+     * 回合結束邏輯
+     */
+    endTurn() {
+        this.isMyTurn = false;
+        return this.getState();
+    }
+
     _shuffleArray(array) {
         for (let i = array.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
@@ -53,32 +73,20 @@ export class GameEngine {
         return array;
     }
 
-    /**
-     * 抽卡邏輯
-     * @param {number} count - 抽卡數量
-     */
     drawCard(count) {
         for (let i = 0; i < count; i++) {
-            if (this.deck.length === 0) break; // 牌庫已空
-            
+            if (this.deck.length === 0) break;
             const card = this.deck.pop();
-            
-            // 規則：手牌上限 6 張
             if (this.hand.length < 6) {
                 this.hand.push(card);
             } else {
                 console.log(`手牌已達 6 張上限，卡牌溢出捨棄: ${card.name}`);
-                // 若未來有墓地系統，可在此處擴充將 card 推進墓地陣列
             }
         }
     }
 
     /**
-     * 嘗試打出卡牌 (驗證規則)
-     * @param {string} cardId - 卡牌 ID
-     * @param {number} x - 目標 X 座標
-     * @param {number} y - 目標 Y 座標
-     * @returns {Object} { success: boolean, reason: string, updatedHand: Array }
+     * 嘗試打出卡牌
      */
     playCard(cardId, x, y) {
         if (!this.isMyTurn) return { success: false, reason: '現在不是您的回合' };
@@ -91,16 +99,22 @@ export class GameEngine {
         const card = this.hand[cardIndex];
         if (card.currentCD > 0) return { success: false, reason: '卡牌仍在冷卻中' };
 
-        // 扣除 AP，將單位寫入棋盤陣列，並從手牌移除
         this.currentAP -= 1;
         this.board[y][x] = { type: card.name, owner: this.isHost ? 'HOST' : 'GUEST', hp: 5 };
         this.hand.splice(cardIndex, 1);
 
-        return { success: true, updatedHand: this.hand, currentAP: this.currentAP };
+        return { success: true, updatedHand: this.hand, currentAP: this.currentAP, playedCard: card };
     }
 
     /**
-     * 取得當前遊戲狀態 (供 UI 渲染使用)
+     * 接收對手出牌指令並寫入本地棋盤陣列
+     */
+    syncOpponentPlay(x, y, cardName) {
+        this.board[y][x] = { type: cardName, owner: this.isHost ? 'GUEST' : 'HOST', hp: 5 };
+    }
+
+    /**
+     * 取得當前遊戲狀態
      */
     getState() {
         return {
@@ -108,6 +122,7 @@ export class GameEngine {
             maxAP: this.maxAP,
             deckCount: this.deck.length,
             hand: this.hand,
+            board: this.board,
             isMyTurn: this.isMyTurn
         };
     }
