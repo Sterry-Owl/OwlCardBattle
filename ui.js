@@ -3,28 +3,33 @@
  * 專責處理 DOM 操作、8x8 棋盤渲染與拖曳事件 (Drag and Drop)
  */
 export class UIManager {
-    /**
-     * @param {Object} elements - DOM 節點參考
-     * @param {Object} callbacks - 使用者操作的回呼函式
-     */
     constructor(elements, callbacks = {}) {
         this.boardElement = elements.board;
         this.handContainer = elements.hand;
         this.apDisplay = elements.apDisplay;
+        this.btnEndTurn = elements.btnEndTurn;
+        this.turnIndicator = elements.turnIndicator;
         
         this.callbacks = {
             onCardDropped: callbacks.onCardDropped || (() => {}),
-            onCellClicked: callbacks.onCellClicked || (() => {})
+            onCellClicked: callbacks.onCellClicked || (() => {}),
+            onEndTurnClicked: callbacks.onEndTurnClicked || (() => {})
         };
 
-        this.draggedCardId = null;
+        // 綁定結束回合按鈕事件
+        if (this.btnEndTurn) {
+            this.btnEndTurn.addEventListener('click', () => {
+                this.callbacks.onEndTurnClicked();
+            });
+        }
     }
 
     /**
-     * 初始渲染 8x8 棋盤網格，並綁定拖放事件
+     * 渲染 8x8 棋盤與其內部實體
+     * @param {Array} boardData - GameEngine 的二維陣列狀態
      */
-    renderBoard() {
-        this.boardElement.innerHTML = ''; // 清空現有網格
+    renderBoard(boardData) {
+        this.boardElement.innerHTML = ''; 
 
         for (let y = 0; y < 8; y++) {
             for (let x = 0; x < 8; x++) {
@@ -33,27 +38,22 @@ export class UIManager {
                 cell.dataset.x = x;
                 cell.dataset.y = y;
 
-                // 綁定網格點擊事件 (預留給棋子移動與攻擊)
                 cell.addEventListener('click', () => {
                     this.callbacks.onCellClicked({ x, y });
                 });
 
-                // 綁定拖曳經過事件 (必須取消預設行為才能觸發 drop)
                 cell.addEventListener('dragover', (e) => {
                     e.preventDefault();
                     cell.classList.add('drag-over');
                 });
 
-                // 綁定拖曳離開事件 (清除視覺回饋)
                 cell.addEventListener('dragleave', () => {
                     cell.classList.remove('drag-over');
                 });
 
-                // 綁定放置事件
                 cell.addEventListener('drop', (e) => {
                     e.preventDefault();
                     cell.classList.remove('drag-over');
-                    
                     const cardId = e.dataTransfer.getData('text/plain');
                     if (cardId) {
                         this.callbacks.onCardDropped({
@@ -64,33 +64,40 @@ export class UIManager {
                     }
                 });
 
+                // 若該座標有實體，則渲染棋子 DOM
+                const entityData = boardData[y][x];
+                if (entityData) {
+                    const entityEl = document.createElement('div');
+                    entityEl.classList.add('board-entity');
+                    // 區分陣營顏色
+                    entityEl.classList.add(entityData.owner === 'HOST' ? 'entity-host' : 'entity-guest');
+                    // 若為君主，套用特殊樣式
+                    if (entityData.type === '君主') {
+                        entityEl.classList.add('entity-king');
+                    }
+                    // 顯示文字
+                    entityEl.textContent = entityData.type;
+                    
+                    cell.appendChild(entityEl);
+                }
+
                 this.boardElement.appendChild(cell);
             }
         }
     }
 
-    /**
-     * 更新手牌畫面
-     * @param {Array} cards - 卡牌資料陣列 { id, name, type, currentCD }
-     */
     renderHand(cards) {
-        this.handContainer.innerHTML = ''; // 清空現有手牌
-
+        this.handContainer.innerHTML = ''; 
         cards.forEach(card => {
             const cardEl = document.createElement('div');
             cardEl.classList.add('card');
             
-            // 根據 CD 決定是否可拖曳
             if (card.currentCD <= 0) {
                 cardEl.draggable = true;
-                
-                // 拖曳開始
                 cardEl.addEventListener('dragstart', (e) => {
                     cardEl.classList.add('dragging');
                     e.dataTransfer.setData('text/plain', card.id);
                 });
-
-                // 拖曳結束
                 cardEl.addEventListener('dragend', () => {
                     cardEl.classList.remove('dragging');
                 });
@@ -99,26 +106,33 @@ export class UIManager {
                 cardEl.classList.add('on-cooldown');
             }
 
-            // 組合卡牌內部 DOM (防範 XSS 攻擊，避免使用 innerHTML 寫入不可信資料)
             const titleEl = document.createElement('div');
             titleEl.textContent = card.name;
-            
             const cdEl = document.createElement('div');
             cdEl.textContent = card.currentCD > 0 ? `CD: ${card.currentCD}` : '可使用';
 
             cardEl.appendChild(titleEl);
             cardEl.appendChild(cdEl);
-            
             this.handContainer.appendChild(cardEl);
         });
     }
 
-    /**
-     * 更新行動點數顯示
-     * @param {number} currentAP - 當前 AP
-     * @param {number} maxAP - 最大 AP
-     */
     updateAP(currentAP, maxAP = 3) {
         this.apDisplay.textContent = `行動點數 (AP): ${currentAP} / ${maxAP}`;
+    }
+
+    /**
+     * 更新回合狀態 UI (文字提示與按鈕鎖定)
+     */
+    updateTurnStatus(isMyTurn) {
+        if (isMyTurn) {
+            this.turnIndicator.textContent = '當前狀態：您的回合';
+            this.turnIndicator.style.color = '#d32f2f';
+            this.btnEndTurn.disabled = false;
+        } else {
+            this.turnIndicator.textContent = '當前狀態：對手回合';
+            this.turnIndicator.style.color = '#555';
+            this.btnEndTurn.disabled = true;
+        }
     }
 }
