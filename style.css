@@ -1,0 +1,93 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    padding: 20px;
+    background-color: #f4f4f9;
+}
+
+/* 遊戲主介面佈局 */
+#game-container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+#status-bar {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    font-weight: bold;
+}
+
+/* 8x8 棋盤網格系統 (CSS Grid) */
+.board-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border: 2px solid #333;
+    background-color: #fff;
+    margin-bottom: 20px;
+}
+
+/* 棋盤單一網格 */
+.board-cell {
+    border: 1px solid #ccc;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+}
+
+/* 當有物件拖曳經過網格時的視覺回饋 */
+.board-cell.drag-over {
+    background-color: #e0f7fa;
+    border: 2px dashed #00bcd4;
+}
+
+/* 手牌區域佈局 (Flexbox) */
+.hand-flex {
+    display: flex;
+    gap: 10px;
+    padding: 10px;
+    background-color: #e0e0e0;
+    min-height: 120px;
+    overflow-x: auto;
+}
+
+/* 單張卡牌樣式 */
+.card {
+    width: 80px;
+    height: 110px;
+    background-color: #fff;
+    border: 2px solid #555;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 5px;
+    cursor: grab;
+    user-select: none;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+}
+
+.card:active {
+    cursor: grabbing;
+}
+
+/* 卡牌拖曳中的半透明狀態 */
+.card.dragging {
+    opacity: 0.5;
+}
+
+/* 卡牌冷卻中 (CD > 0) 的不可拖曳狀態 */
+.card.on-cooldown {
+    background-color: #999;
+    cursor: not-allowed;
+    color: #fff;
+}
