@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>雙人卡牌棋盤遊戲</title>
+    
+    <!-- 引入 PeerJS 用於 P2P 網路連線 -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    
+    <!-- 預留樣式表連結 -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- 連線大廳介面 -->
+    <div id="lobby-container">
+        <h2>遊戲連線大廳</h2>
+        
+        <!-- 建立房間區域 -->
+        <div class="panel">
+            <h3>建立遊戲 (房主)</h3>
+            <button id="btn-create-room">建立房間</button>
+            <p>您的房間代碼：<strong id="room-id-display">尚未建立</strong></p>
+        </div>
+
+        <!-- 加入房間區域 -->
+        <div class="panel">
+            <h3>加入遊戲 (客機)</h3>
+            <input type="text" id="input-room-id" placeholder="請輸入對手的房間代碼">
+            <button id="btn-join-room">連線加入</button>
+        </div>
+
+        <!-- 連線狀態提示文字 -->
+        <p id="connection-status">系統狀態：等待操作...</p>
+    </div>
+
+    <!-- 遊戲主介面 (初始設定為隱藏) -->
+    <div id="game-container" style="display: none;">
+        <!-- 狀態資訊列 -->
+        <div id="status-bar">
+            <div id="turn-indicator">當前狀態：連線中...</div>
+            <div id="ap-display">行動點數 (AP): 0 / 3</div>
+        </div>
+
+        <!-- 對手資訊 (示意用) -->
+        <div id="opponent-area">
+            <span>對手狀態區</span>
+        </div>
+
+        <!-- 8x8 棋盤區域 -->
+        <div id="board" class="board-grid">
+            <!-- 64 個網格將由 JavaScript 動態生成 -->
+        </div>
+
+        <!-- 玩家手牌與牌庫區域 -->
+        <div id="player-area">
+            <div id="deck-status">牌庫剩餘數量: <span id="deck-count">20</span></div>
+            <!-- 手牌容器 -->
+            <div id="hand-container" class="hand-flex">
+                <!-- 手牌將由 JavaScript 動態生成 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 預留 JavaScript 邏輯連結 -->
+    <script src="app.js"></script>
+</body>
+</html>
