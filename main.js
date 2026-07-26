@@ -25,21 +25,22 @@ document.addEventListener('DOMContentLoaded', () => {
             turnIndicator: document.getElementById('turn-indicator')
         },
         {
-            // 玩家拖曳出牌事件
             onCardDropped: (data) => {
                 const result = gameEngine.playCard(data.cardId, data.targetX, data.targetY);
                 
                 if (result.success) {
                     const currentState = gameEngine.getState();
-                    uiManager.renderHand(currentState.hand);
+                    // [Bug 修復] 傳遞 isMyTurn 參數
+                    uiManager.renderHand(currentState.hand, currentState.isMyTurn);
                     uiManager.updateAP(currentState.ap, currentState.maxAP);
-                    uiManager.renderBoard(currentState.board); // 重新渲染棋盤畫出士兵
+                    uiManager.renderBoard(currentState.board); 
                     
-                    // 傳送指令給對手，包含打出的卡牌名稱 (供對方渲染)
+                    // [Bug 修復] 精確傳遞 cardName 與 cardType，避免封包語意混淆
                     networkManager.sendData({
                         action: 'PLAY_CARD',
                         cardId: data.cardId,
-                        cardType: result.playedCard.name, 
+                        cardName: result.playedCard.name, 
+                        cardType: result.playedCard.type,
                         targetX: data.targetX,
                         targetY: data.targetY
                     });
@@ -50,10 +51,11 @@ document.addEventListener('DOMContentLoaded', () => {
             onCellClicked: (data) => {
                 console.log('使用者點擊棋盤網格:', data);
             },
-            // 玩家點擊結束回合事件
             onEndTurnClicked: () => {
                 const state = gameEngine.endTurn();
                 uiManager.updateTurnStatus(state.isMyTurn);
+                // 結束回合後，必須重繪手牌以鎖定拖曳
+                uiManager.renderHand(state.hand, state.isMyTurn);
                 
                 networkManager.sendData({
                     action: 'END_TURN'
@@ -73,7 +75,6 @@ document.addEventListener('DOMContentLoaded', () => {
             lobbyContainer.style.display = 'none';
             gameContainer.style.display = 'block';
             
-            // 模擬外部構築好的 20 張牌組
             const myDeck = [];
             for (let i = 1; i <= 15; i++) {
                 myDeck.push({ id: `soldier_${i}`, name: '步兵', type: 'SOLDIER', currentCD: 1 });
@@ -82,33 +83,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 myDeck.push({ id: `skill_${i}`, name: '戰術衝鋒', type: 'SKILL', currentCD: 2 });
             }
 
-            // 啟動遊戲
             gameEngine.initGame(isHost, myDeck);
             const initialState = gameEngine.getState();
             
-            // 渲染初始畫面
             uiManager.renderBoard(initialState.board);
-            uiManager.renderHand(initialState.hand);
+            // [Bug 修復] 傳遞 isMyTurn 參數
+            uiManager.renderHand(initialState.hand, initialState.isMyTurn);
             uiManager.updateAP(initialState.ap, initialState.maxAP);
             uiManager.updateTurnStatus(initialState.isMyTurn);
             
             if (deckCountDisplay) deckCountDisplay.textContent = initialState.deckCount;
         },
-        // 接收對手網路指令
         onDataReceived: (data) => {
             console.log('接收到同步指令:', data);
             
             if (data.action === 'PLAY_CARD') {
-                // 對手出牌：更新本地棋盤陣列並重繪畫面
-                gameEngine.syncOpponentPlay(data.targetX, data.targetY, data.cardType);
+                // [Bug 修復] 接收 cardName 與 cardType 進行棋盤渲染同步
+                gameEngine.syncOpponentPlay(data.targetX, data.targetY, data.cardName, data.cardType);
                 uiManager.renderBoard(gameEngine.getState().board);
             } 
             else if (data.action === 'END_TURN') {
-                // 對手結束回合：本地端開始回合
                 const state = gameEngine.startTurn();
                 uiManager.updateTurnStatus(state.isMyTurn);
                 uiManager.updateAP(state.ap, state.maxAP);
-                uiManager.renderHand(state.hand); // 更新手牌 CD 減少與新抽的卡
+                // [Bug 修復] 傳遞 isMyTurn 參數，解鎖拖曳
+                uiManager.renderHand(state.hand, state.isMyTurn); 
                 if (deckCountDisplay) deckCountDisplay.textContent = state.deckCount;
             }
         },
