@@ -7,32 +7,26 @@ export class GameEngine {
         this.maxAP = 3;
         this.currentAP = 0;
         this.board = Array.from({ length: 8 }, () => Array(8).fill(null));
-        this.deck = []; // 玩家專屬牌庫
-        this.hand = []; // 當前手牌
+        this.deck = [];
+        this.hand = [];
         this.isHost = false;
         this.isMyTurn = false;
         
-        // 追蹤雙方君主座標 (供未來技能卡判定使用)
         this.kingPositions = {
             HOST: { x: 0, y: 0 },
             GUEST: { x: 7, y: 7 }
         };
     }
 
-    /**
-     * 初始化遊戲狀態
-     */
     initGame(isHost, initialDeck) {
         this.isHost = isHost;
         this.deck = this._shuffleArray([...initialDeck]);
 
-        // 初始化君主位置
         this.board[this.kingPositions.HOST.y][this.kingPositions.HOST.x] = { type: '君主', owner: 'HOST', hp: 10 };
         this.board[this.kingPositions.GUEST.y][this.kingPositions.GUEST.x] = { type: '君主', owner: 'GUEST', hp: 10 };
 
         this.drawCard(3);
 
-        // 若為房主，直接啟動第一回合
         if (isHost) {
             this.startTurn();
         } else {
@@ -41,14 +35,10 @@ export class GameEngine {
         }
     }
 
-    /**
-     * 回合開始邏輯 (重置 AP, CD 減 1, 抽 1 張卡)
-     */
     startTurn() {
         this.isMyTurn = true;
         this.currentAP = this.maxAP;
         
-        // 手牌 CD 減 1
         this.hand.forEach(card => {
             if (card.currentCD > 0) card.currentCD--;
         });
@@ -57,10 +47,10 @@ export class GameEngine {
         return this.getState();
     }
 
-    /**
-     * 回合結束邏輯
-     */
     endTurn() {
+        // [Bug 修復] 嚴格驗證，防止非己方回合強制觸發
+        if (!this.isMyTurn) return this.getState();
+        
         this.isMyTurn = false;
         return this.getState();
     }
@@ -85,37 +75,47 @@ export class GameEngine {
         }
     }
 
-    /**
-     * 嘗試打出卡牌
-     */
     playCard(cardId, x, y) {
         if (!this.isMyTurn) return { success: false, reason: '現在不是您的回合' };
         if (this.currentAP < 1) return { success: false, reason: '行動點數 (AP) 不足' };
-        if (this.board[y][x] !== null) return { success: false, reason: '該座標已有其他單位' };
-
+        
         const cardIndex = this.hand.findIndex(c => c.id === cardId);
         if (cardIndex === -1) return { success: false, reason: '手牌中找不到該卡牌' };
         
         const card = this.hand[cardIndex];
         if (card.currentCD > 0) return { success: false, reason: '卡牌仍在冷卻中' };
 
+        // [Bug 修復] 士兵卡才需要檢查目標座標是否為空
+        if (card.type === 'SOLDIER' && this.board[y][x] !== null) {
+            return { success: false, reason: '該座標已有其他單位' };
+        }
+
+        // 結算 AP 與手牌
         this.currentAP -= 1;
-        this.board[y][x] = { type: card.name, owner: this.isHost ? 'HOST' : 'GUEST', hp: 5 };
         this.hand.splice(cardIndex, 1);
+
+        // [Bug 修復] 區分卡牌邏輯：技能卡不實體化寫入棋盤
+        if (card.type === 'SOLDIER') {
+            this.board[y][x] = { type: card.name, owner: this.isHost ? 'HOST' : 'GUEST', hp: 5 };
+        } else if (card.type === 'SKILL') {
+            // 預留技能處理邏輯，暫時不對棋盤陣列做任何變更
+            console.log(`發動技能卡: ${card.name}，目標座標: [${x}, ${y}]`);
+        }
 
         return { success: true, updatedHand: this.hand, currentAP: this.currentAP, playedCard: card };
     }
 
     /**
      * 接收對手出牌指令並寫入本地棋盤陣列
+     * @param {string} cardType - 卡牌主類別 (SOLDIER/SKILL)
      */
-    syncOpponentPlay(x, y, cardName) {
-        this.board[y][x] = { type: cardName, owner: this.isHost ? 'GUEST' : 'HOST', hp: 5 };
+    syncOpponentPlay(x, y, cardName, cardType) {
+        // [Bug 修復] 對手打出技能卡時，不實體化
+        if (cardType === 'SOLDIER') {
+            this.board[y][x] = { type: cardName, owner: this.isHost ? 'GUEST' : 'HOST', hp: 5 };
+        }
     }
 
-    /**
-     * 取得當前遊戲狀態
-     */
     getState() {
         return {
             ap: this.currentAP,
