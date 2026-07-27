@@ -84,33 +84,30 @@ export class GameEngine {
         
         const card = this.hand[cardIndex];
         if (card.currentCD > 0) return { success: false, reason: '卡牌仍在冷卻中' };
-
-        // [Bug 修復] 士兵卡才需要檢查目標座標是否為空
-        if (card.type === 'SOLDIER' && this.board[y][x] !== null) {
-            return { success: false, reason: '該座標已有其他單位' };
+        if (card.type === 'SOLDIER') {
+            if (this.board[y][x] !== null) {
+                return { success: false, reason: '該座標已有其他單位' };
+            }
+            const myKingPos = this.isHost ? this.kingPositions.HOST : this.kingPositions.GUEST;
+            const dx = Math.abs(x - myKingPos.x);
+            const dy = Math.abs(y - myKingPos.y);
+            
+            if (dx > 1 || dy > 1 || (dx === 0 && dy === 0)) {
+                return { success: false, reason: '士兵只能召喚在己方君主周圍的相鄰空格內' };
+            }
         }
-
-        // 結算 AP 與手牌
         this.currentAP -= 1;
         this.hand.splice(cardIndex, 1);
-
-        // [Bug 修復] 區分卡牌邏輯：技能卡不實體化寫入棋盤
         if (card.type === 'SOLDIER') {
             this.board[y][x] = { type: card.name, owner: this.isHost ? 'HOST' : 'GUEST', hp: 5 };
         } else if (card.type === 'SKILL') {
-            // 預留技能處理邏輯，暫時不對棋盤陣列做任何變更
             console.log(`發動技能卡: ${card.name}，目標座標: [${x}, ${y}]`);
         }
 
         return { success: true, updatedHand: this.hand, currentAP: this.currentAP, playedCard: card };
     }
 
-    /**
-     * 接收對手出牌指令並寫入本地棋盤陣列
-     * @param {string} cardType - 卡牌主類別 (SOLDIER/SKILL)
-     */
     syncOpponentPlay(x, y, cardName, cardType) {
-        // [Bug 修復] 對手打出技能卡時，不實體化
         if (cardType === 'SOLDIER') {
             this.board[y][x] = { type: cardName, owner: this.isHost ? 'GUEST' : 'HOST', hp: 5 };
         }
