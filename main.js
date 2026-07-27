@@ -1,6 +1,7 @@
 import { NetworkManager } from './network.js';
 import { UIManager } from './ui.js';
 import { GameEngine } from './game.js';
+import { getCardById } from './cards.js'; // 引入卡牌圖鑑與工廠函式
 
 document.addEventListener('DOMContentLoaded', () => {
     const btnCreateRoom = document.getElementById('btn-create-room');
@@ -30,12 +31,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 if (result.success) {
                     const currentState = gameEngine.getState();
-                    // [Bug 修復] 傳遞 isMyTurn 參數
                     uiManager.renderHand(currentState.hand, currentState.isMyTurn);
                     uiManager.updateAP(currentState.ap, currentState.maxAP);
                     uiManager.renderBoard(currentState.board); 
                     
-                    // [Bug 修復] 精確傳遞 cardName 與 cardType，避免封包語意混淆
                     networkManager.sendData({
                         action: 'PLAY_CARD',
                         cardId: data.cardId,
@@ -54,7 +53,6 @@ document.addEventListener('DOMContentLoaded', () => {
             onEndTurnClicked: () => {
                 const state = gameEngine.endTurn();
                 uiManager.updateTurnStatus(state.isMyTurn);
-                // 結束回合後，必須重繪手牌以鎖定拖曳
                 uiManager.renderHand(state.hand, state.isMyTurn);
                 
                 networkManager.sendData({
@@ -75,19 +73,41 @@ document.addEventListener('DOMContentLoaded', () => {
             lobbyContainer.style.display = 'none';
             gameContainer.style.display = 'block';
             
+            // 透過卡牌圖鑑動態建構真實的 20 張牌組
             const myDeck = [];
-            for (let i = 1; i <= 15; i++) {
-                myDeck.push({ id: `soldier_${i}`, name: '步兵', type: 'SOLDIER', currentCD: 1 });
+            
+            // 準備目前圖鑑中可用的 8 種士兵 ID
+            const soldierIds = ['h_sol_1', 'h_sol_2', 'h_sol_3', 'h_sol_4', 'h_sol_5', 'h_sol_6', 'h_sol_7', 'h_sol_8'];
+            
+            // 放入 15 張士兵卡 (自圖鑑循環抽取以進行測試)
+            for (let i = 0; i < 15; i++) {
+                const templateId = soldierIds[i % soldierIds.length];
+                const cardData = getCardById(templateId);
+                
+                if (cardData) {
+                    myDeck.push({
+                        ...cardData,
+                        templateId: templateId, // 保留原始圖鑑 ID 以供未來查詢對照
+                        id: `${templateId}_${Date.now()}_${i}`, // 產生遊戲內唯一 ID，配合現有 GameEngine
+                        currentCD: cardData.baseCD // 將基礎 CD 轉化為當前 CD 供狀態機運算
+                    });
+                }
             }
+
+            // 由於尚未定義真實的技能卡圖鑑，此處暫時保留 5 張模擬技能卡防呆
             for (let i = 1; i <= 5; i++) {
-                myDeck.push({ id: `skill_${i}`, name: '戰術衝鋒', type: 'SKILL', currentCD: 2 });
+                myDeck.push({ 
+                    id: `skill_mock_${Date.now()}_${i}`, 
+                    name: '戰術衝鋒', 
+                    type: 'SKILL', 
+                    currentCD: 2 
+                });
             }
 
             gameEngine.initGame(isHost, myDeck);
             const initialState = gameEngine.getState();
             
             uiManager.renderBoard(initialState.board);
-            // [Bug 修復] 傳遞 isMyTurn 參數
             uiManager.renderHand(initialState.hand, initialState.isMyTurn);
             uiManager.updateAP(initialState.ap, initialState.maxAP);
             uiManager.updateTurnStatus(initialState.isMyTurn);
@@ -98,7 +118,6 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log('接收到同步指令:', data);
             
             if (data.action === 'PLAY_CARD') {
-                // [Bug 修復] 接收 cardName 與 cardType 進行棋盤渲染同步
                 gameEngine.syncOpponentPlay(data.targetX, data.targetY, data.cardName, data.cardType);
                 uiManager.renderBoard(gameEngine.getState().board);
             } 
@@ -106,7 +125,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const state = gameEngine.startTurn();
                 uiManager.updateTurnStatus(state.isMyTurn);
                 uiManager.updateAP(state.ap, state.maxAP);
-                // [Bug 修復] 傳遞 isMyTurn 參數，解鎖拖曳
                 uiManager.renderHand(state.hand, state.isMyTurn); 
                 if (deckCountDisplay) deckCountDisplay.textContent = state.deckCount;
             }
